@@ -58,8 +58,16 @@ The `ebcore` WMP identifier maps bidirectionally to the ebCore Party ID URN:
 
 ```
 WMP:     ebcore:iso6523:0007:5567164818
-ebCore:  urn:oasis:names:tc:ebcore:partyid-type:iso6523:0007:5567164818
+ebCore:  urn:oasis:names:tc:ebcore:partyid-type:iso6523:0007::5567164818
 ```
+
+> **The `::` is the OASIS grammar**: the ebCore PartyIdType URN separates the
+> scheme code from the party identifier with a double colon
+> (`…partyid-type:<catalog>:<scheme>::<identifier>`), exactly as the PEPPOL
+> key form in §2.3 (`iso6523-actorid-upis::0007:…`) does. The single-colon
+> form was a transcription error found live in the Cleverbase interop
+> (a SAN checker built to this section's example rejected a certificate
+> whose SAN carried the correct OASIS form).
 
 Conversion:
 - **WMP → ebCore:** prepend `urn:oasis:names:tc:ebcore:partyid-type:` and replace first two `:` separators
