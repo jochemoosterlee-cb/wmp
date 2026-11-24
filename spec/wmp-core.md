@@ -1943,6 +1943,7 @@ GET https://<domain>/.well-known/wmp-configuration
   "accepted_schemes": ["did", "x509", "uri"],
   "security_modes": ["tls", "mls", "mls-optional"],
   "mls_key_packages": "https://example.com/.well-known/mls-key-packages",
+  "invitation_jwks": {"keys": [{"kty": "EC", "crv": "P-256", "x": "...", "y": "...", "kid": "<RFC 7638 thumbprint>", "alg": "ES256", "use": "sig"}]},
   "erds": {
     "consignment_modes": ["basic", "consented"],
     "assurance_levels": ["low", "substantial", "high"],
@@ -1971,6 +1972,7 @@ GET https://<domain>/.well-known/wmp-configuration
 | `accepted_schemes` | string[] | OPTIONAL | Identifier schemes this endpoint can authenticate (pre-connect hint for clients) |
 | `security_modes` | string[] | OPTIONAL | Supported security modes |
 | `mls_key_packages` | string | OPTIONAL | URL to MLS KeyPackages endpoint |
+| `invitation_jwks` | object | OPTIONAL | The invitation verification keys (RFC 7517 JWK Set, `"use": "sig"`) — the publication point for the provider-delegate invitation model ([WMP-INVITATION] §2.3): invitation `kid`s that are bare JWK thumbprints resolve here |
 | `relay` | string | OPTIONAL | Default relay endpoint for this entity |
 | `erds` | object | OPTIONAL | ERDS capability metadata (Common Service Interface, see §7.5.1.1) |
 | `recipient_metadata` | object | OPTIONAL | Recipient capability preferences (Common Service Interface, see §7.5.1.2) |

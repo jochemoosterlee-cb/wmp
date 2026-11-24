@@ -111,6 +111,9 @@ The `kid` MUST be resolvable to the inviter's public key:
 - For `did:key` / `did:jwk`: the key is inline in the DID.
 - For `x509:san:dns` / `x509:san:uri`: the `x5c` header parameter MUST be included with the certificate chain.
 - For `did:web`: the key is resolved via the DID Document.
+- For a bare JWK thumbprint ([RFC 7638]) `kid` — the provider-delegate model: the key is resolved via the minting provider's well-known WMP configuration (§7.5.1 of [WMP-CORE]). The `invitation_jwks` field of that document carries the invitation verification keys inline as an [RFC 7517] JWK Set (`"use": "sig"`); alternatively, an `endpoints.jwks` entry names a standalone JWKS endpoint serving the same set. The verifier derives the well-known URL from the invitation's own `provider` field (`{provider}/.well-known/wmp-configuration`), so no prior knowledge of the provider is required.
+
+**Provider-delegate key lifecycle:** invitation verification keys in the provider-delegate model are ephemeral per provider instance — an endpoint that mints invitations generates a fresh key pair at boot and publishes it in its well-known configuration. Verifiers MUST resolve the key fresh per verification (or cache no longer than the minting instance's lifetime) rather than pinning it: a `kid` that resolves to no published key MUST be treated as a stale invitation from a restarted instance, not as a forgery. Authenticity in this model derives from the TLS-verified fetch of the provider's well-known document (Web PKI, §4.2 step 3), which binds the published key to the domain the invitation names.
 
 **Verification:** The invitee verifies the signature before acting on the invitation. Verification failure MUST cause the invitation to be rejected.
 
