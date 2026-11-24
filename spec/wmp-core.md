@@ -767,6 +767,56 @@ Each identifier scheme maps to one or more authentication types:
 - Bearer tokens MUST be validated for audience, expiry, and issuer.
 - For `mtls`, the TLS client certificate MUST be verified against a trust anchor appropriate to the sender's identifier scheme.
 
+#### 4.4.8 Per-Request Proof for HTTPS Sessions
+
+When the HTTPS transport cannot carry the client's credential at the TLS level (a load balancer terminates TLS and does not forward the client certificate, a serverless platform has no TLS client-cert hook), the session's per-request binding (§8.7.1) requires a proof on every request. The proof follows the DPoP model (RFC 9449): a compact JWS whose payload binds the request to the session, proving possession of the private key that matches the identity the session was created under.
+
+**Proof format** (RFC 7515 compact JWS, three-segment `header.payload.signature`):
+
+```json
+{
+  "alg": "ES256",
+  "typ": "wmp-proof+jwt",
+  "x5c": ["MIIB...(leaf)...", "MIIC...(issuer)..."]
+}
+```
+
+The protected header carries `alg`, `typ`, and the certificate chain (`x5c`, leaf first — base64-encoded DER, as §5.4). For `signed_challenge`-authenticated sessions, the header carries `kid` instead (the DID Document key id).
+
+The payload, JCS-canonicalized before signing:
+
+```json
+{
+  "htm": "POST",
+  "htu": "https://relay.example.com/wmp",
+  "iat": 1795526400,
+  "jti": "proof-8f4b2c1d",
+  "sid": "ses-a1b2c3d4"
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `htm` | The HTTP request method (RFC 9449 §4.1's `htm`). |
+| `htu` | The HTTP request URI, without query or fragment (RFC 9449 §4.1's `htu`). |
+| `iat` | The proof's issuance time, unix seconds (RFC 9449 §4.1's `iat`). The receiver MUST reject proofs outside its clock-skew tolerance (§8.5). |
+| `jti` | A unique identifier for this proof (RFC 9449 §4.1's `jti`). A receiver MAY cache recent `jti` values to detect replays; the `iat` window bounds the cache. |
+| `sid` | The WMP session id. Binds the proof to one session — replay to a different session is impossible by construction. |
+
+**Transport:** the proof is sent as the `Authorization` header value with the `DPoP` scheme: `Authorization: DPoP <proof-jws>`. When a bearer token is also present (the `dpop` auth type), the proof doubles as the DPoP proof and the access token hashes into `ath` per RFC 9449.
+
+**Verification:** the receiver:
+
+1. Parses the JWS, extracts the certificate chain (or `kid`) from the header, and verifies the signature over the canonicalized payload.
+2. Checks `sid` matches the session the request names.
+3. Checks `htm` and `htu` match the actual request.
+4. Checks `iat` is within the clock-skew tolerance and `jti` has not been seen (when caching).
+5. Verifies the certificate chain (or resolves the `kid` against the DID Document) and matches the leaf certificate's SAN (or the key) to the session's authenticated identity (§8.7.1: the same principal).
+
+A proof that fails any check MUST be answered `401` (the HTTPS binding's refusal, wmp-transport §4.3.1).
+
+**When required:** a deployment whose transport carries the credential at TLS (`mtls`) does not need per-request proofs — the TLS certificate IS the per-request credential (§8.7.1). A deployment that terminates TLS without forwarding the client certificate and accepts `x5c`- or `signed_challenge`-authenticated sessions MUST require per-request proofs on every HTTPS request after the session create. The deployment's well-known configuration document SHOULD advertise this requirement (the `security_modes` field already names the transport's modes).
+
 ### 4.5 Session Resumption
 
 When a transport connection is lost (network failure, mobile app backgrounding), a client MAY resume an existing session on a new connection without repeating capability negotiation.
