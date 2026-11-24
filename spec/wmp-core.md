@@ -1900,34 +1900,52 @@ WMP defines a layered discovery architecture with a single primary mechanism —
 
 #### 7.5.1 Primary Mechanism: Well-Known Configuration
 
-The primary discovery mechanism is the **well-known WMP configuration** document, served at `/.well-known/wmp-configuration` on the identifier's domain. This is the REQUIRED mechanism for all domain-based identifiers.
+The primary discovery mechanism is the **well-known WMP configuration** document, served under `/.well-known/wmp-configuration` on the identifier's host. This is the REQUIRED mechanism for all domain-based identifiers.
 
-**Domain extraction rules:**
+A host MAY serve several service providers (tenants), each with its own configuration. A tenant is named by the path component of its identifier, and the well-known URL is built the way OAuth 2.0 Authorization Server Metadata (RFC 8414 Section 3.1) and OpenID4VCI build theirs: the well-known segment is inserted between the host and the tenant path.
 
-| Identifier type | Domain extraction |
-|-----------------|-------------------|
-| `x509:san:dns:example.com` | Use the SAN DNS value: `example.com` |
-| `x509:san:uri:https://example.com/...` | Extract the host: `example.com` |
-| `https://example.com` | Use the host directly: `example.com` |
-| `https://example.com/path` | Use the host: `example.com` |
-| `did:web:example.com` | Extract domain from DID: `example.com` |
-| `did:web:example.com:path:...` | Extract domain: `example.com` (path components are ignored for discovery — the endpoint is the provider's, not a per-user path) |
-| `did:<other-method>:...` | Domain not extractable — use DID profile resolver (§7.5.4) or session parameters |
-| `ebcore:...` | See profile-specific resolver (Section 7.5.3) |
-| `x509:sha256:...` | Domain not extractable — use session parameters or profile resolver |
-| `mdoc:...` | Domain not extractable — use session parameters or profile resolver |
-| `opaque` | No discovery — endpoint provided during session creation |
+**Discovery base.** Every domain-based identifier maps to a *discovery base*: a host (with an optional port) and a tenant path. The tenant path is empty for an identifier that names the whole host.
 
-For any identifier where a domain can be extracted, discovery is:
+| Identifier type | Host | Tenant path |
+|-----------------|------|-------------|
+| `x509:san:dns:example.com` | `example.com` | *(empty)* |
+| `https://example.com` | `example.com` | *(empty)* |
+| `https://example.com/tenant1` | `example.com` | `/tenant1` |
+| `x509:san:uri:https://example.com/tenant1` | `example.com` | `/tenant1` |
+| `did:web:example.com` | `example.com` | *(empty)* |
+| `did:web:example.com:tenant1` | *(none)* | Resolved by the did:web method: the DID Document at `https://example.com/tenant1/did.json` names the endpoint (DID profile resolver, §7.5.4) |
+| `did:<other-method>:...` | *(none)* | Not domain-based — use DID profile resolver (§7.5.4) or session parameters |
+| `ebcore:...` | *(none)* | See profile-specific resolver (Section 7.5.3) |
+| `x509:sha256:...` | *(none)* | Not domain-based — use session parameters or profile resolver |
+| `mdoc:...` | *(none)* | Not domain-based — use session parameters or profile resolver |
+| `opaque` | *(none)* | No discovery — endpoint provided during session creation |
+
+The tenant path is the identifier's path with any trailing `/` removed. A path of `/` is the empty tenant path. An identifier with a query or fragment component, with userinfo, or with a `.` or `..` path segment has no discovery base, and discovery for it MUST fail.
+
+A tenant path names a service provider, in keeping with the privacy principle of §7.5: a tenant is a wallet provider, issuer, verifier or other organization served from a shared host. A tenant path MUST NOT name an individual user or wallet unit.
+
+**Well-known URL.** For a discovery base, discovery is:
 
 ```
-GET https://<domain>/.well-known/wmp-configuration
+GET https://<host>/.well-known/wmp-configuration<tenant-path>
 ```
+
+| Identifier | Well-known URL |
+|------------|----------------|
+| `x509:san:dns:example.com` | `https://example.com/.well-known/wmp-configuration` |
+| `https://example.com/` | `https://example.com/.well-known/wmp-configuration` |
+| `https://example.com/tenant1` | `https://example.com/.well-known/wmp-configuration/tenant1` |
+| `https://example.com:8443/tenants/acme/` | `https://example.com:8443/.well-known/wmp-configuration/tenants/acme` |
+
+A client MUST fetch exactly this URL. When the tenant path is non-empty and the fetch does not yield a valid configuration, discovery fails: the client MUST NOT use the configuration of the host root or of a shorter path in its place, because that configuration belongs to a different provider.
+
+**Binding the document to its discovery base.** The configuration names the discovery base it describes in `discovery_base`, an `https` URL of the form `https://<host><tenant-path>` (for example `https://example.com/tenants/acme`; `https://example.com` for the empty tenant path). A configuration served for a non-empty tenant path MUST carry `discovery_base`. A client MUST compare a `discovery_base` it receives with the discovery base it derived from the identifier — scheme and host case-insensitively, port and tenant path exactly — and MUST reject the configuration when they differ, or when the tenant path is non-empty and `discovery_base` is absent. This is the counterpart of the `issuer` check of RFC 8414 Section 3.3: it detects a server that answers every tenant path with one catch-all document.
 
 **Well-known WMP configuration document:**
 
 ```json
 {
+  "discovery_base": "https://example.com",
   "supported_versions": ["0.1"],
   "endpoints": {
     "websocket": "wss://example.com/wmp",
@@ -1965,6 +1983,7 @@ GET https://<domain>/.well-known/wmp-configuration
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
+| `discovery_base` | string | CONDITIONAL | The discovery base this document describes: `https://<host><tenant-path>`. REQUIRED when the tenant path is non-empty, RECOMMENDED otherwise. |
 | `supported_versions` | string[] | REQUIRED | Protocol versions this endpoint supports (§2.2) |
 | `endpoints` | object | REQUIRED | Map of transport type to endpoint URL |
 | `capabilities` | object | OPTIONAL | Pre-advertised capabilities (informational) |
@@ -2022,11 +2041,11 @@ For identifier schemes that require scheme-specific resolution logic (e.g., DID 
 
 The discovery resolution order is:
 
-1. **Primary (domain-based):** Extract domain → fetch `/.well-known/wmp-configuration` (§7.5.1)
+1. **Primary (domain-based):** Derive the discovery base → fetch its well-known configuration (§7.5.1)
 2. **Resolver chain:** Profile-registered resolvers for identifier schemes without extractable domains
 3. **Fallback:** Session parameters / out-of-band configuration (§7.5.2)
 
-For DID identifiers with extractable domains (e.g., `did:web`), step 1 applies directly — the DID profile resolver (step 2) is not needed. For non-domain DIDs (e.g., `did:key`, `did:jwk`, `did:tdw`), the DID profile resolver is used.
+For a `did:web` identifier without a path (`did:web:example.com`), step 1 applies directly — the DID profile resolver (step 2) is not needed. For a `did:web` identifier with a path and for non-domain DIDs (e.g., `did:key`, `did:jwk`, `did:tdw`), the DID profile resolver is used.
 
 A profile registers a resolver by declaring which identifier scheme prefixes it handles. The resolver returns the WMP endpoint URL (and optionally pre-fetched capabilities), or signals that it cannot resolve the identifier.
 
@@ -2047,19 +2066,21 @@ Profiles that define resolvers MUST document their resolution algorithm, failure
 
 #### 7.5.4 DID Profile Resolver
 
-For DID identifiers without an extractable domain (e.g., `did:key`, `did:jwk`, `did:tdw`), the DID Document provides a **profile-specific resolver** for endpoint discovery. This mechanism is registered as a standard profile resolver (§7.5.3).
+For DID identifiers without a discovery base (e.g., `did:key`, `did:jwk`, `did:tdw`, and a `did:web` identifier with a path), the DID Document provides a **profile-specific resolver** for endpoint discovery. This mechanism is registered as a standard profile resolver (§7.5.3).
 
-For DID identifiers with an extractable domain (e.g., `did:web`, `did:webvh`), well-known configuration (§7.5.1) is the primary discovery mechanism. DID Document resolution MAY be used as a supplementary source but is not required.
+For DID identifiers that name a whole host (e.g., `did:web:example.com`), well-known configuration (§7.5.1) is the primary discovery mechanism. DID Document resolution MAY be used as a supplementary source but is not required.
+
+A `did:web` identifier with a path (`did:web:example.com:tenant1`) is resolved the way the did:web method defines: its DID Document is at `https://example.com/tenant1/did.json`, and the `WMPMessaging` service entry of that document names the endpoint. This is how a did:web tenant of a shared host publishes its endpoint; WMP does not define a well-known URL of its own for it.
 
 **Resolution algorithm:**
 
 1. Resolve the DID Document using the DID method's resolution mechanism.
 2. Search the `service` array for an entry with `type` equal to `WMPMessaging`.
 3. Extract the `serviceEndpoint` URL from the matching entry.
-4. If no `WMPMessaging` service is found and a domain is derivable from the DID (e.g., `did:web:example.com` → `example.com`), fall back to well-known configuration (§7.5.1).
-5. If no domain is derivable (e.g., `did:key`, `did:jwk`), discovery fails — the endpoint MUST be provided via session parameters (§7.5.2) or relay registration (§7.5.5).
+4. If no `WMPMessaging` service is found and the DID has a discovery base (`did:web:example.com` → `example.com`), fall back to well-known configuration (§7.5.1). A `did:web` identifier with a path has no discovery base: the client MUST NOT use the configuration of the host root for it.
+5. Otherwise (e.g., `did:key`, `did:jwk`, a `did:web` identifier with a path), discovery fails — the endpoint MUST be provided via session parameters (§7.5.2) or relay registration (§7.5.5).
 
-> **Note:** For `did:web` identifiers, well-known configuration is preferred because both mechanisms derive from the same domain. The DID Document MAY be used for key discovery (below) even when endpoint discovery uses well-known configuration.
+> **Note:** For `did:web` identifiers without a path, well-known configuration is preferred because both mechanisms derive from the same domain. The DID Document MAY be used for key discovery (below) even when endpoint discovery uses well-known configuration.
 
 > **Privacy note:** DID Documents that encode per-user endpoint information (e.g., `did:web:wallet.example.com:users:alice` with a per-user `WMPMessaging` service entry) publicly expose the user-to-provider binding. This is a privacy violation in most wallet deployments. See §7.5.5 for the recommended architecture where endpoints are associated with wallet providers, not individual users.
 
@@ -2159,7 +2180,15 @@ Well-known configuration for a wallet provider:
 }
 ```
 
-> **Anti-pattern:** Publishing per-user DID Documents (e.g., `did:web:wallet.example.com:users:alice`) with `WMPMessaging` service entries publicly exposes which users are served by which wallet provider. This leaks private information and SHOULD NOT be used in production deployments. Similarly, per-user sub-path well-known configurations (`https://wallet.example.com/users/alice/.well-known/wmp-configuration`) have the same privacy problem.
+**Several providers on one host.** A platform that hosts several wallet providers, issuers or verifiers on one host gives each of them an identifier with a tenant path and serves one configuration per tenant (§7.5.1):
+
+- **Provider identifier:** `https://wallets.example.com/acme` or `x509:san:uri:https://wallets.example.com/acme`
+- **Discovery:** `https://wallets.example.com/.well-known/wmp-configuration/acme`, with `"discovery_base": "https://wallets.example.com/acme"`
+- **did:web tenants:** A tenant identified as `did:web:wallets.example.com:acme` publishes its endpoint in the `WMPMessaging` service entry of its DID Document at `https://wallets.example.com/acme/did.json` (§7.5.4).
+- **Endpoints:** Each tenant's configuration names that tenant's endpoints (for example `wss://wallets.example.com/acme/wmp`). Tenants MAY share an endpoint when the platform routes by the participant identifiers of the session.
+- **User routing and privacy:** As above, per tenant. The tenant path names the provider; users of a tenant are reached through that tenant's relay.
+
+> **Anti-pattern:** Publishing per-user DID Documents (e.g., `did:web:wallet.example.com:users:alice`) with `WMPMessaging` service entries publicly exposes which users are served by which wallet provider. This leaks private information and SHOULD NOT be used in production deployments. Similarly, per-user well-known configurations (a tenant path that names a user, such as `https://wallet.example.com/.well-known/wmp-configuration/users/alice`) have the same privacy problem and are forbidden by §7.5.1.
 
 **3. Mobile/native wallet (no web server)**
 
@@ -2510,6 +2539,7 @@ The well-known configuration document (§7.5.1) is served as plain JSON over HTT
 - **DNS or BGP hijacking** combined with certificate misissuance could allow an attacker to serve a malicious configuration pointing to attacker-controlled endpoints or relays.
 - **CDN or reverse proxy compromise** could alter the configuration in transit between the origin server and the client.
 - **Cache poisoning** could serve stale or modified configurations after endpoint rotation.
+- **Tenant mix-up** on a shared host: a server or reverse proxy that answers a tenant's well-known URL with another tenant's configuration, or with the host's own, would send that tenant's sessions to the wrong provider.
 
 **Existing mitigations:**
 
@@ -2524,6 +2554,7 @@ The well-known configuration document (§7.5.1) is served as plain JSON over HTT
 
 - Deployments SHOULD use DNSSEC and CAA records to strengthen domain-based discovery. Combined with Certificate Transparency monitoring, this provides strong integrity guarantees for well-known configuration documents without requiring additional metadata infrastructure.
 - Trust frameworks such as OpenID Federation define signed entity statements that can carry WMP endpoint metadata with hierarchical trust chains. Profiles MAY specify OpenID Federation as a metadata integrity mechanism.
+- Clients MUST apply the `discovery_base` check of §7.5.1 and MUST NOT substitute the host-root configuration for a tenant's. Tenants of one host share its TLS certificate and its operator: the operator of a multi-tenant host is trusted to serve each tenant its own configuration, and tenants that need isolation from one another at the discovery layer use separate hosts.
 - Implementations SHOULD apply standard HTTP cache validation (ETags, `Cache-Control`) and SHOULD NOT cache well-known configurations beyond their declared freshness lifetime.
 - The DID profile resolver (§7.5.4) provides an alternative discovery path for DID identifiers. However, the integrity guarantees of DID Documents depend on the specific DID method — `did:web` has the same HTTPS/DNS trust model as well-known configuration and does not provide additional integrity.
 
@@ -2664,6 +2695,8 @@ A registry of authentication scheme types (§4.4), each with:
 - [RFC 8785 — JSON Canonicalization Scheme (JCS)](https://www.rfc-editor.org/rfc/rfc8785)
 - [RFC 3161 — Internet X.509 PKI Time-Stamp Protocol](https://www.rfc-editor.org/rfc/rfc3161)
 - [RFC 7515 — JSON Web Signature (JWS)](https://www.rfc-editor.org/rfc/rfc7515)
+- [RFC 8414 — OAuth 2.0 Authorization Server Metadata](https://www.rfc-editor.org/rfc/rfc8414)
+- [RFC 8615 — Well-Known Uniform Resource Identifiers (URIs)](https://www.rfc-editor.org/rfc/rfc8615)
 - [Model Context Protocol Specification](https://spec.modelcontextprotocol.io/)
 - [ETSI EN 319 522-1 — Electronic Registered Delivery Services](https://www.etsi.org/deliver/etsi_en/319500_319599/31952201/)
 
