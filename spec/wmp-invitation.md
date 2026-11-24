@@ -55,7 +55,7 @@ An invitation is a JSON object with the following fields:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `provider` | string | REQUIRED | The inviter's wallet provider identifier. MUST be a domain-based identifier from which a well-known configuration can be fetched (§7.5.1). Typically `x509:san:dns:<domain>`. |
+| `provider` | string | REQUIRED | The inviter's wallet provider identifier. MUST be a domain-based identifier from which a well-known configuration can be fetched (§7.5.1). Typically `x509:san:dns:<domain>`, or an identifier with a tenant path (`https://<host>/<tenant>`) for a provider on a shared host. |
 | `sender` | string | REQUIRED | The inviter's participant identifier. MAY be a non-discoverable identifier (e.g., `did:key:...`). This is the identity that will appear as the `sender` in subsequent WMP messages. |
 | `nonce` | string | REQUIRED | A unique, cryptographically random value (at least 128 bits of entropy, base64url-encoded). Used to correlate the invitation with the resulting `wmp.session.create`. |
 | `relay` | string | OPTIONAL | The inviter's relay endpoint URL. When present, the invitee MAY use this directly instead of fetching the well-known configuration. When absent, the invitee discovers the relay via the provider's well-known configuration. |
@@ -242,7 +242,7 @@ The invitee receives the invitation and:
 3. Check `expires_at` — reject if expired.
 4. Verify the `signature` (§2.3) using the public key derived from `sender`.
 5. Extract the provider domain from the `provider` field.
-6. If `relay` is present, use it directly. Otherwise, fetch `/.well-known/wmp-configuration` from the provider domain and extract the relay endpoint.
+6. If `relay` is present, use it directly. Otherwise, fetch the provider's well-known configuration (WMP Core §7.5.1) and extract the relay endpoint.
 
 #### Step 4: Relay Connection
 
