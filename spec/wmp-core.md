@@ -801,7 +801,7 @@ The payload, JCS-canonicalized before signing:
 | `htu` | The HTTP request URI, without query or fragment (RFC 9449 §4.1's `htu`). |
 | `iat` | The proof's issuance time, unix seconds (RFC 9449 §4.1's `iat`). The receiver MUST reject proofs outside its clock-skew tolerance (§8.5). |
 | `jti` | A unique identifier for this proof (RFC 9449 §4.1's `jti`). A receiver MAY cache recent `jti` values to detect replays; the `iat` window bounds the cache. |
-| `sid` | The WMP session id. Binds the proof to one session — replay to a different session is impossible by construction. |
+| `sid` | The WMP session id. Binds the proof to one session — replay to a different session is impossible by construction. Omitted for authentication on `session.create` messages, mandatory otherwise. |
 
 **Transport:** the proof is sent as the `Authorization` header value with the `DPoP` scheme: `Authorization: DPoP <proof-jws>`. When a bearer token is also present (the `dpop` auth type), the proof doubles as the DPoP proof and the access token hashes into `ath` per RFC 9449.
 
