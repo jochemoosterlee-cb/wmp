@@ -1034,7 +1034,7 @@ Recipients MAY acknowledge message receipt:
 }
 ```
 
-Status values: `received`, `read`, `processed`, `failed`.
+Status values: `received`, `read`, `processed`, `failed`, `rejected`.
 
 #### 5.3.1 Offline Delivery and Message Status
 
