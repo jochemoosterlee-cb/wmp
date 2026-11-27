@@ -2363,6 +2363,7 @@ This hybrid model enables a single session to carry both:
 ### 8.5 Replay Protection
 
 - Message `id` fields MUST be unique within a session.
+- The `id` of a `wmp.message.deliver` request MUST be globally unique.
 - MLS epoch numbers provide additional replay protection for encrypted messages.
 
 #### 8.5.1 Timestamp Validation
