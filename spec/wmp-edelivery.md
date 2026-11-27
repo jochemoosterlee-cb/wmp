@@ -260,6 +260,8 @@ When per-message legal identity binding is required (e.g., for ERDS evidence), t
 
 The leaf certificate's Subject or SAN MUST match the ebCore identifier's organization. Verification follows the trust anchor configured for the eDelivery network (e.g., PEPPOL PKI hierarchy).
 
+A SAN URI carries the identifier in the WMP form (§2.1) or the ebCore URN form (§2.2); verifiers MUST accept both.
+
 ## 5. Session Establishment
 
 ### 5.1 WMP Session via eDelivery Discovery
