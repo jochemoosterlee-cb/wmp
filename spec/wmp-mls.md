@@ -257,7 +257,7 @@ A WMP relay is a server that acts as the Delivery Service. It:
 3. Forwards MLS handshake messages.
 4. Does NOT have access to plaintext (E2E encryption).
 
-The relay processes only the plaintext `wmp` metadata for routing. The encrypted payload is opaque to the relay.
+The relay processes only the plaintext `wmp` metadata and the `group_id` of the MLS framing (RFC 9420 §6) for routing. The encrypted payload is opaque to the relay.
 
 ### 5.3 Relay Discovery
 
