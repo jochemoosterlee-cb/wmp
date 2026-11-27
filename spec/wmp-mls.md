@@ -138,6 +138,8 @@ A participant joins by processing the Welcome message:
 }
 ```
 
+If a Welcome is lost (no `wmp.mls.group.join` follows), the sender creates a new group from a fresh KeyPackage of that participant.
+
 ### 3.3 Adding Participants
 
 ```json
