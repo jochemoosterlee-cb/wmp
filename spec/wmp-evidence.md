@@ -156,12 +156,7 @@ Evidence is delivered as a WMP notification:
       "sender": "x509:san:dns:relay-a.example.com",
       "timestamp": "2026-04-29T10:15:31Z",
       "timestamp_token": "<base64url-encoded RFC 3161 timestamp>",
-      "signature": {
-        "alg": "ES256",
-        "kid": "x509:san:dns:relay-a.example.com#evidence-key-1",
-        "value": "<base64url-encoded detached signature>",
-        "x5c": ["<base64-encoded DER certificate>"]
-      }
+      "signature": "<detached JWS, x5c in its protected header>"
     },
     "evidence": {
       "evidence_id": "evi-7f8e9d0c-b1a2-43e5-8f6d-7e8a9b0c1d2e",
