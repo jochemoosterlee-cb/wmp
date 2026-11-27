@@ -290,13 +290,15 @@ The relay queues messages for offline participants. When a participant reconnect
   "id": "fetch-1",
   "result": {
     "messages": [
-      {"wmp": {..., "encrypted": true, "epoch": 3}, "ciphertext": "..."},
-      {"wmp": {..., "encrypted": true, "epoch": 3}, "ciphertext": "..."}
+      {"jsonrpc": "2.0", "id": "msg-1", "method": "wmp.message.deliver", "params": {"wmp": {..., "encrypted": true, "epoch": 3}, "ciphertext": "..."}},
+      {"jsonrpc": "2.0", "id": "msg-2", "method": "wmp.message.deliver", "params": {"wmp": {..., "encrypted": true, "epoch": 3}, "ciphertext": "..."}}
     ],
     "has_more": false
   }
 }
 ```
+
+Each item in `messages` is a complete JSON-RPC message, as it was queued for the participant.
 
 ## 6. Authentication Service
 
