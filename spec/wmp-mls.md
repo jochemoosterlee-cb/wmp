@@ -132,6 +132,7 @@ A participant joins by processing the Welcome message:
   "method": "wmp.mls.group.join",
   "params": {
     "wmp": {"version": "0.1", "session_id": "ses-a1b2c3d4", "sender": "did:key:z6MkfBob..."},
+    "group_id": "<base64url-encoded group ID>",
     "welcome_processed": true
   }
 }
